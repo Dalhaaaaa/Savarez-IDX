@@ -1,0 +1,224 @@
+<!-- templates/blog/homepage.html -->
+{% extends 'blog/base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Pokemon</h1>
+<a href="{% url 'blog-create' %}" class="btn btn-primary mb-3">Create New Card</a>
+
+<!-- Placeholder for blogs -->
+<div id="blog-list" class="d-flex flex-wrap gap-3" style="height: 400px; overflow: auto; scrollbar-width: none; -ms-overflow-style: none;">
+    <!-- Blogs will be dynamically loaded here -->
+</div>
+
+<!-- Loader -->
+<div id="loader" class="text-center my-3">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const userID = JSON.parse(document.getElementById('user_id').textContent);
+    console.log(userID);
+    const blogDetailUrl = "{% url 'blog-details' 0 %}".slice(0, -2);  // Remove the trailing '0' in the URL template
+    const blogUpdateUrl = "{% url 'blog-update' 0 %}".slice(0, -2);  // Same for update
+    const blogDeleteUrl = "{% url 'blog-delete' 0 %}".slice(0, -2);  // Same for delete
+
+    function toggleLike(blogId, heartIconElement, likeCountElement) {
+        const isLiked = heartIconElement.classList.contains('text-danger');
+        const bloglikes_id = heartIconElement.dataset.bloglikesid || null;
+
+        // Toggle icon locally to give immediate feedback
+        if (isLiked) {
+            heartIconElement.classList.remove('text-danger');
+            heartIconElement.classList.add('text-muted');
+        } else {
+            heartIconElement.classList.remove('text-muted');
+            heartIconElement.classList.add('text-danger');
+        }
+
+        // Determine API method (DELETE if unliking, POST if liking)
+        const method = isLiked ? 'DELETE' : 'POST';
+        const url = isLiked ? `api/likeblogs/${bloglikes_id}/` : 'api/likeblogs/';
+        const body = JSON.stringify({
+            user: userID,
+            blog: blogId
+        });
+
+        // Send request to create or delete like
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'), // CSRF token for security
+            },
+            body: body
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to toggle like for post ${blogId}`);
+            }
+            // Parse JSON only if response has content (status is not 204)
+            return response.status === 204 ? null : response.json();
+        })
+        .then(data => {
+            if (data && !isLiked) {
+                // Like was added, update dataset
+                heartIconElement.dataset.bloglikesid = data.id;
+            } else if (isLiked) {
+                // Like was removed, clear dataset
+                heartIconElement.dataset.bloglikesid = '';
+            }
+
+            // Update like count dynamically
+            const currentCount = parseInt(likeCountElement.textContent || "0", 10);
+            const newCount = isLiked ? currentCount - 1 : currentCount + 1;
+            displayLikeCount(likeCountElement, newCount);
+        })
+        .catch(error => {
+            console.error('Error toggling like:', error);
+            // Revert icon state on error
+            if (isLiked) {
+                heartIconElement.classList.add('text-danger');
+                heartIconElement.classList.remove('text-muted');
+            } else {
+                heartIconElement.classList.add('text-muted');
+                heartIconElement.classList.remove('text-danger');
+            }
+        });
+    }
+
+    function displayLikeCount(likeCountElement, count) {
+        likeCountElement.textContent = count > 0 ? `${count}` : '';
+    }
+
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          // Check if this cookie string begins with the name we want
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+
+    function initializeLikeStatus(blogs) {
+        // Fetch the likes data for all posts
+        fetch('api/likeblogs/')
+            .then(response => response.json())
+            .then(likesData => {
+
+                // Iterate over each post to set like status and like count
+                blogs.forEach(blog => {
+                    const heartIconElement = document.getElementById(`like-${blog.id}`);
+                    const likeCountElement = document.getElementById(`like-count-${blog.id}`);
+
+                    // Filter likes to get only those for the current blog
+                    const blogLikes = likesData.filter(like => like.blog && like.blog.id === blog.id);
+
+                    // Check if the current post is liked by the user
+                    const isLikedByUser = blogLikes.some(like => like.user && like.user.id === userID);
+
+                    // Update the heart icon based on whether the post is liked by the user
+                    if (isLikedByUser) {
+                        const userLike = blogLikes.find(like => like.user && like.user.id === userID);
+                        heartIconElement.classList.add('text-danger');
+                        heartIconElement.classList.remove('text-muted');
+                        heartIconElement.dataset.bloglikesid = userLike.id;
+                    } else {
+                        heartIconElement.classList.add('text-muted');
+                        heartIconElement.classList.remove('text-danger');
+                        heartIconElement.dataset.bloglikesid = '';
+                    }
+
+                    // Update the like count for the post
+                    displayLikeCount(likeCountElement, blogLikes.length);
+                });
+            })
+            .catch(error => console.error('Error initializing like status:', error));
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const blogList = document.getElementById('blog-list');
+        const loader = document.getElementById('loader');
+
+        // Function to fetch blogs via AJAX
+        const fetchBlogs = async () => {
+            try {
+                const response = await fetch('api/blogs/'); // Ensure this URL is correct
+                if (!response.ok) {
+                    console.error("Failed to fetch blogs:", response.status, response.statusText);
+                    throw new Error('Failed to fetch blogs.');
+                }
+                const data = await response.json();
+                console.log("Blogs fetched:", data); // Debug log
+                loader.style.display = 'none';
+
+                initializeLikeStatus(data);
+
+                // Populate blog cards
+                data.forEach(blog => {
+                    let blog_img_url = blog.image;
+
+                    // If the image URL exists, adjust it to a valid path
+                    if (blog.image) {
+                        blog_img_url = blog.image.replace(/^https?:\/\/[^\/]+/, '');
+                    } else {
+                        blog_img_url = blog.image;
+                    }
+
+                    // Create the blog card with the image and content
+                    const blogCard = `
+                        <div class="card shadow-sm" style="width: 18rem;">
+                            <div class="card-body">
+                                <img src="${blog_img_url}" alt="${blog.title}" class="card-img-top" style="height: 200px; object-fit: contain; margin-bottom: 12px;">
+                                <h5 class="card-title">${blog.title}</h5>
+                                <p class="card-text">${blog.content.substring(0, 100)}...</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <a href="${blogDetailUrl}/${blog.id}/" class="btn btn-info btn-sm">View</a>
+                                        <a href="${blogUpdateUrl}/${blog.id}/" class="btn btn-warning btn-sm">Edit</a>
+                                        <a href="${blogDeleteUrl}/${blog.id}/" class="btn btn-danger btn-sm">Delete</a>
+                                    </div>
+                                    <div>
+                                        <i class="fa fa-heart text-muted like-icon" id="like-${blog.id}" data-blog-id="${blog.id}"></i>
+                                        <span id='like-count-${blog.id}'></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                    
+                    // Append the card to the blog list container
+                    blogList.innerHTML += blogCard;
+                });
+
+            } catch (error) {
+                loader.style.display = 'none';
+                console.error("Error fetching blogs:", error); // Debug log
+                blogList.innerHTML = `<p class="text-danger">Failed to load blogs. Please try again later.</p>`;
+            }
+        };
+        
+        blogList.addEventListener('click', function (event) {
+            if (event.target.classList.contains('like-icon')) {
+                const blogId = event.target.dataset.blogId;
+                const heartIconElement = event.target;
+                const likeCountElement = document.getElementById(`like-count-${blogId}`);
+                toggleLike(blogId, heartIconElement, likeCountElement);
+            }
+        });
+        // Call the function to fetch blogs
+        fetchBlogs();
+    });
+</script>
+{% endblock %}

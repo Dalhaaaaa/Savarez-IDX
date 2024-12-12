@@ -1,0 +1,96 @@
+/* Custom Form Styles */
+
+body {
+    background: url(https://images3.alphacoders.com/641/thumb-1920-641419.png);
+    background-repeat: no-repeat;
+    background-size: cover;
+    height: 100vh;
+}
+
+form {
+    background: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 2rem;
+    max-width: 500px;
+    margin: auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+form h1 {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    text-align: center;
+    color: #333;
+}
+
+form label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #555;
+}
+
+form input, form textarea, form select {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    outline: none;
+    background: #f9f9f9;
+    transition: border-color 0.3s ease-in-out;
+}
+
+form input:focus, form textarea:focus, form select:focus {
+    border-color: #007bff;
+    background: #ffffff;
+}
+
+form textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+form .form-error {
+    color: #dc3545;
+    font-size: 0.9rem;
+    margin-top: -0.8rem;
+    margin-bottom: 0.8rem;
+}
+
+form .btn {
+    width: 100%;
+    padding: 0.8rem;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    cursor: pointer;
+    margin-top: 1rem;
+    transition: background 0.3s ease-in-out;
+}
+
+form .btn-primary {
+    background: #007bff;
+    color: #fff;
+}
+
+form .btn-primary:hover {
+    background: #0056b3;
+}
+
+form .btn-secondary {
+    background: #6c757d;
+    color: #fff;
+}
+
+form .btn-secondary:hover {
+    background: #5a6268;
+}
+
+form .btn-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}

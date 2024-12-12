@@ -1,0 +1,187 @@
+{% extends 'blog/base.html' %}
+
+{% block title %}{{ blog.title }}{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <!-- Blog Post -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <!-- Blog Image -->
+            {% if blog.image %}
+                <div class="mb-4 text-center">
+                    <img src="{{ blog.image.url }}" alt="{{ blog.title }}" class="img-fluid rounded" style="max-width: 400px; height: 400px;">
+                </div>
+            {% endif %}
+
+            <!-- Blog Content -->
+            <h1 class="card-title">{{ blog.title }}</h1>
+            <p class="card-text">{{ blog.content }}</p>
+            <p class="text-muted">
+                <small>Created at: {{ blog.created_at }}</small><br>
+                <small>Last updated: {{ blog.updated_at }}</small>
+            </p>
+        </div>
+    </div>
+
+    <!-- Comments Section -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h3 class="mb-0">Comments</h3>
+        </div>
+        <div class="card-body">
+            <!-- Comments List -->
+            <ul id="comments-list" class="list-group mb-4">
+                <!-- Existing comments will be dynamically loaded here -->
+            </ul>
+
+            <!-- Add Comment Form -->
+            <form id="comment-form">
+                <div class="mb-3">
+                    <label for="author" class="form-label">Your Name</label>
+                    <input type="text" id="author" class="form-control" placeholder="Enter your name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="content" class="form-label">Your Comment</label>
+                    <textarea id="content" class="form-control" placeholder="Write your comment here..." rows="4" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Comment</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="mt-4">
+        <a href="{% url 'blog-homepage' %}" class="btn btn-secondary">Back to Blog Homepage</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const commentForm = document.getElementById('comment-form');
+        const commentsList = document.getElementById('comments-list');
+        const blogId = {{ blog.id }}; // Assuming this is being passed from a templating engine
+    
+        if (!blogId) {
+            console.error("Blog ID is missing");
+            return;
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Check if this cookie string begins with the name we want
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                    }
+                }
+
+            return cookieValue;
+        }
+    
+        // Fetch comments for the current blog
+        const fetchComments = async () => {
+            try {
+                const response = await fetch('/posts/api/blogcomments/');
+                if (!response.ok) {
+                    throw new Error("Failed to fetch comments");
+                }
+                const comments = await response.json();
+                
+                // Filter comments by blogId
+                const filteredComments = comments.filter(comment => comment.blog === blogId);
+
+                // Clear current list and add filtered comments
+                commentsList.innerHTML = '';
+                filteredComments.forEach(comment => {
+                    const commentElement = document.createElement('li');
+                    commentElement.className = "list-group-item d-flex justify-content-between align-items-start";
+                    commentElement.id = `comment-${comment.id}`;
+                    commentElement.innerHTML = ` 
+                        <div>
+                            <strong>${comment.author}</strong><br>
+                            <span>${comment.content}</span>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="deleteComment(${comment.id})">Delete</button>
+                    `;
+                    commentsList.appendChild(commentElement);
+                });
+            } catch (error) {
+                console.error("Error fetching comments:", error);
+            }
+        };
+    
+        // Add a new comment
+        commentForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const author = document.getElementById('author').value;
+            const content = document.getElementById('content').value;
+            if (!author || !content) {
+                alert("Both fields are required.");
+                return;
+            }
+            try {
+                const response = await fetch(`/posts/api/blogcomments/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({ author, content, blog: blogId }),
+                });
+                if (!response.ok) {
+                    throw new Error("Failed to add comment");
+                }
+                const data = await response.json();
+                const newComment = document.createElement('li');
+                newComment.className = "list-group-item d-flex justify-content-between align-items-start";
+                newComment.id = `comment-${data.id}`;
+                newComment.innerHTML = ` 
+                    <div>
+                        <strong>${data.author}</strong><br>
+                        <span>${data.content}</span>
+                    </div>
+                    <button class="btn btn-danger btn-sm" onclick="deleteComment(${data.id})">Delete</button>
+                `;
+                commentsList.appendChild(newComment);
+                document.getElementById('author').value = '';
+                document.getElementById('content').value = '';
+            } catch (error) {
+                console.error("Error adding comment:", error);
+            }
+        });
+    
+        // Delete a comment
+        window.deleteComment = async function(commentId) {
+            try {
+                const response = await fetch(`/posts/api/blogcomments/${commentId}/`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'), // CSRF token for security
+                    },
+                });
+                if (!response.ok) {
+                    throw new Error("Failed to delete comment");
+                }
+                const commentElement = document.getElementById(`comment-${commentId}`);
+                if (commentElement) {
+                    commentElement.remove();
+                }
+            } catch (error) {
+                console.error("Error deleting comment:", error);
+            }
+        };
+    
+        // Load comments initially
+        fetchComments();
+    });
+</script>    
+{% endblock %}
